@@ -1,0 +1,31 @@
+name: test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go 1.22
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22
+      - name: Run and export tests
+        run: go test -v -covermode=count -coverprofile=coverage.out ./...
+      - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+          file: ./coverage.out

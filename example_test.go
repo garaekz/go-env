@@ -2,9 +2,10 @@ package env_test
 
 import (
 	"fmt"
-	"github.com/qiangxue/go-env"
 	"log"
 	"os"
+
+	"github.com/qiangxue/go-env"
 )
 
 type Config struct {
@@ -45,4 +46,30 @@ func Example_two() {
 	// 127.0.0.1
 	// 8080
 	// test
+}
+
+type Embedded struct {
+	URL  string
+	Port int
+}
+
+type Config2 struct {
+	Nested Embedded `prefix:"NESTED_"`
+}
+
+func Example_three() {
+	_ = os.Setenv("APP_NESTED_URL", "http://example.com")
+	_ = os.Setenv("APP_NESTED_PORT", "8080")
+
+	var cfg Config2
+
+	if err := env.Load(&cfg); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(cfg.Nested.URL)
+	fmt.Println(cfg.Nested.Port)
+	// Output:
+	// http://example.com
+	// 8080
 }

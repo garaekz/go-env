@@ -79,51 +79,53 @@ func Load(structPtr interface{}) error {
 // to the field type and assigned to the field.
 //
 // Load uses the following rules to determine what name should be used to look up the value for a struct field:
-// - If the field has an "env" tag, use the tag value as the name, unless the tag is "-" in which case it means
-//   the field should be skipped.
-// - If the field has no "env" tag, turn the field name into UPPER_SNAKE_CASE format and use that as the name.
-// - Names are prefixed with the specified prefix.
+//   - If the field has an "env" tag, use the tag value as the name, unless the tag is "-" in which case it means
+//     the field should be skipped.
+//   - If the field has no "env" tag, turn the field name into UPPER_SNAKE_CASE format and use that as the name.
+//   - Names are prefixed with the specified prefix.
 //
 // The following types of struct fields are supported:
-// - types implementing Setter, TextUnmarshaler, BinaryUnmarshaler: the corresponding interface method will be used
-//   to populate the field with a string
-// - primary types (e.g. int, string): appropriate parsing functions will be called to parse a string value
-// - other types (e.g. array, struct): the string value is assumed to be in JSON format and is decoded/assigned to the field.
+//   - types implementing Setter, TextUnmarshaler, BinaryUnmarshaler: the corresponding interface method will be used
+//     to populate the field with a string
+//   - primary types (e.g. int, string): appropriate parsing functions will be called to parse a string value
+//   - other types (e.g. array, struct): the string value is assumed to be in JSON format and is decoded/assigned to the field.
+//
+// Special handling for nested structures:
+//   - For fields that are structures (or pointers to structures), Load checks for a "prefix" tag.
+//     If found, this prefix is temporarily appended to the current prefix for loading nested fields,
+//     allowing hierarchical configuration management. The original prefix is restored afterwards.
+//   - If a field is a nil pointer to a struct, it is automatically initialized to ensure that nested
+//     configurations can be loaded without prior manual initialization.
 //
 // Load will log every field that is populated. In case when a field is tagged with `env:",secret"`, the value being
 // logged will be masked for security purpose.
 func (l *Loader) Load(structPtr interface{}) error {
-	rval := reflect.ValueOf(structPtr)
-	if rval.Kind() != reflect.Ptr || !rval.IsNil() && rval.Elem().Kind() != reflect.Struct {
+	value := reflect.ValueOf(structPtr)
+	if value.Kind() != reflect.Ptr || value.IsNil() || value.Elem().Kind() != reflect.Struct {
 		return ErrStructPointer
 	}
-	if rval.IsNil() {
-		return ErrNilPointer
-	}
 
-	rval = rval.Elem()
-	rtype := rval.Type()
+	value = value.Elem()
+	valueType := value.Type()
 
-	for i := 0; i < rval.NumField(); i++ {
-		f := rval.Field(i)
-		if !f.CanSet() {
+	for i := 0; i < value.NumField(); i++ {
+		field := value.Field(i)
+		if !field.CanSet() {
 			continue
 		}
 
-		ft := rtype.Field(i)
+		fieldType := valueType.Field(i)
 
-		if ft.Anonymous {
-			f = indirect(f)
-			if f.Kind() == reflect.Struct {
-				// populate embedded struct
-				if err := l.Load(f.Addr().Interface()); err != nil {
-					return err
-				}
+		if isStructField(field) {
+			err := l.loadStructField(field, fieldType)
+			if err != nil {
+				return err
 			}
+
 			continue
 		}
 
-		name, secret := getName(ft.Tag.Get(TagName), ft.Name)
+		name, secret := getName(fieldType.Tag.Get(TagName), fieldType.Name)
 		if name == "-" {
 			continue
 		}
@@ -134,17 +136,44 @@ func (l *Loader) Load(structPtr interface{}) error {
 			logValue := value
 			if l.log != nil {
 				if secret {
-					l.log("set %v with $%v=\"***\"", ft.Name, name)
+					l.log("set %v with $%v=\"***\"", fieldType.Name, name)
 				} else {
-					l.log("set %v with $%v=\"%v\"", ft.Name, name, logValue)
+					l.log("set %v with $%v=\"%v\"", fieldType.Name, name, logValue)
 				}
 			}
-			if err := setValue(f, value); err != nil {
-				return fmt.Errorf("error reading \"%v\": %v", ft.Name, err)
+			if err := setValue(field, value); err != nil {
+				return fmt.Errorf("error reading \"%v\": %v", fieldType.Name, err)
 			}
 		}
 	}
 	return nil
+}
+
+// loadStructField loads a struct field recursively.
+func (l *Loader) loadStructField(field reflect.Value, fieldType reflect.StructField) error {
+	prefixTag := fieldType.Tag.Get("prefix")
+	originalPrefix := l.prefix // save original prefix
+	// If we have a prefix then we need to set it for the next iteration
+	if prefixTag != "" {
+		l.prefix += prefixTag
+		defer func() { l.prefix = originalPrefix }()
+	}
+
+	if isPointerField(field) && field.IsNil() {
+		field.Set(reflect.New(fieldType.Type.Elem()))
+	}
+
+	return l.Load(field.Addr().Interface())
+}
+
+// isStructField checks if a field is a struct or a pointer to a struct.
+func isStructField(field reflect.Value) bool {
+	return field.Kind() == reflect.Struct || (field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Struct)
+}
+
+// isPointerField checks if a field is a pointer.
+func isPointerField(field reflect.Value) bool {
+	return field.Kind() == reflect.Ptr
 }
 
 // indirect dereferences pointers and returns the actual value it points to.

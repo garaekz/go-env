@@ -180,7 +180,7 @@ func (l *myLogger) Log(format string, args ...interface{}) {
 	l.logs = append(l.logs, fmt.Sprintf(format, args...))
 }
 
-func mockLog(format string, args ...interface{}) {
+func mockLog(string, ...interface{}) {
 }
 
 func mockLookup(name string) (string, bool) {
@@ -196,10 +196,12 @@ func mockLookup(name string) (string, bool) {
 
 func mockLookup2(name string) (string, bool) {
 	data := map[string]string{
-		"APP_HOST":     "localhost",
-		"APP_PORT":     "8080",
-		"APP_URL":      "http://example.com",
-		"APP_PASSWORD": "xyz",
+		"APP_HOST":        "localhost",
+		"APP_PORT":        "8080",
+		"APP_URL":         "http://example.com",
+		"APP_PASSWORD":    "xyz",
+		"APP_NESTED_URL":  "http://example.com",
+		"APP_NESTED_PORT": "8080",
 	}
 	value, ok := data[name]
 	return value, ok
@@ -233,6 +235,10 @@ type Config2 struct {
 
 type Config3 struct {
 	Embedded
+}
+
+type Config4 struct {
+	Nested Embedded `prefix:"NESTED_"`
 }
 
 func TestLoader_Load(t *testing.T) {
@@ -297,6 +303,13 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, 8080, cfg.Port)
 		assert.Equal(t, "http://example.com", cfg.URL)
 	}
+	var cfg2 Config4
+	err = Load(&cfg2)
+	if assert.Nil(t, err) {
+		assert.Equal(t, "http://example.com", cfg2.Nested.URL)
+		assert.Equal(t, 8080, cfg2.Nested.Port)
+	}
 	loader.lookup = oldLookup
 	loader.log = oldLog
+
 }

@@ -1,9 +1,9 @@
 # go-env
 
-[![GoDoc](https://godoc.org/github.com/qiangxue/go-env?status.png)](http://godoc.org/github.com/qiangxue/go-env)
+[![GoDoc](https://godoc.org/github.com/garaekz/go-env?status.png)](http://godoc.org/github.com/garaekz/go-env)
 [![Build Status](https://travis-ci.org/qiangxue/go-env.svg?branch=master)](https://travis-ci.org/qiangxue/go-env)
 [![Coverage Status](https://coveralls.io/repos/github/qiangxue/go-env/badge.svg?branch=master)](https://coveralls.io/github/qiangxue/go-env?branch=master)
-[![Go Report](https://goreportcard.com/badge/github.com/qiangxue/go-env)](https://goreportcard.com/report/github.com/qiangxue/go-env)
+[![Go Report](https://goreportcard.com/badge/github.com/garaekz/go-env)](https://goreportcard.com/report/github.com/garaekz/go-env)
 
 ## Description
 
@@ -22,7 +22,7 @@ Go 1.13 or above.
 Run the following command to install the package:
 
 ```
-go get github.com/qiangxue/go-env
+go get github.com/garaekz/go-env
 ```
 
 ### Loading From Environment Variables
@@ -34,7 +34,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/qiangxue/go-env"
+	"github.com/garaekz/go-env"
 	"os"
 )
 
@@ -78,7 +78,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/qiangxue/go-env"
+	"github.com/garaekz/go-env"
 	"log"
 	"os"
 )

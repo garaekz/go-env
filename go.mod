@@ -1,4 +1,4 @@
-module github.com/qiangxue/go-env
+module github.com/garaekz/go-env
 
 go 1.22
 

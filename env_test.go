@@ -256,7 +256,7 @@ func TestLoader_Load(t *testing.T) {
 	assert.Equal(t, ErrStructPointer, err)
 	var cfg1 *Config1
 	err = l.Load(cfg1)
-	assert.Equal(t, ErrNilPointer, err)
+	assert.Equal(t, ErrStructPointer, err)
 
 	logger := &myLogger{}
 	l = NewWithLookup("", mockLookup, logger.Log)

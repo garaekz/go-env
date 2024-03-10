@@ -8,7 +8,6 @@ import (
 	"encoding"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"reflect"
@@ -105,8 +104,8 @@ func (l *Loader) Load(structPtr interface{}) error {
 		return ErrStructPointer
 	}
 
+	valueType := value.Elem().Type()
 	value = value.Elem()
-	valueType := value.Type()
 
 	for i := 0; i < value.NumField(); i++ {
 		field := value.Field(i)
@@ -116,64 +115,62 @@ func (l *Loader) Load(structPtr interface{}) error {
 
 		fieldType := valueType.Field(i)
 
-		if isStructField(field) {
-			err := l.loadStructField(field, fieldType)
-			if err != nil {
+		if field.Kind() == reflect.Struct || (field.Kind() == reflect.Ptr && field.Type().Elem().Kind() == reflect.Struct) {
+			if field.Kind() == reflect.Ptr && field.IsNil() {
+				field.Set(reflect.New(fieldType.Type.Elem()))
+			}
+
+			fieldToLoad := field
+			if field.Kind() == reflect.Ptr {
+				fieldToLoad = field.Elem()
+			}
+			if err := l.loadStructField(fieldToLoad, fieldType); err != nil {
 				return err
 			}
-
-			continue
-		}
-
-		name, secret := getName(fieldType.Tag.Get(TagName), fieldType.Name)
-		if name == "-" {
-			continue
-		}
-
-		name = l.prefix + name
-
-		if value, ok := l.lookup(name); ok {
-			logValue := value
-			if l.log != nil {
-				if secret {
-					l.log("set %v with $%v=\"***\"", fieldType.Name, name)
-				} else {
-					l.log("set %v with $%v=\"%v\"", fieldType.Name, name, logValue)
-				}
-			}
-			if err := setValue(field, value); err != nil {
-				return fmt.Errorf("error reading \"%v\": %v", fieldType.Name, err)
+		} else {
+			if err := l.assignValue(field, fieldType); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
 }
 
-// loadStructField loads a struct field recursively.
+// loadStructField loads a struct field with values from environment variables.
 func (l *Loader) loadStructField(field reflect.Value, fieldType reflect.StructField) error {
 	prefixTag := fieldType.Tag.Get("prefix")
-	originalPrefix := l.prefix // save original prefix
-	// If we have a prefix then we need to set it for the next iteration
+	originalPrefix := l.prefix
 	if prefixTag != "" {
 		l.prefix += prefixTag
 		defer func() { l.prefix = originalPrefix }()
 	}
 
-	if isPointerField(field) && field.IsNil() {
+	if field.Kind() == reflect.Ptr && field.IsNil() {
 		field.Set(reflect.New(fieldType.Type.Elem()))
 	}
 
 	return l.Load(field.Addr().Interface())
 }
 
-// isStructField checks if a field is a struct or a pointer to a struct.
-func isStructField(field reflect.Value) bool {
-	return field.Kind() == reflect.Struct || (field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Struct)
-}
+// assignValue assigns a value to a struct field from an environment variable.
+func (l *Loader) assignValue(field reflect.Value, fieldType reflect.StructField) error {
+	name, secret := getName(fieldType.Tag.Get(TagName), fieldType.Name)
+	if name == "-" {
+		return nil
+	}
 
-// isPointerField checks if a field is a pointer.
-func isPointerField(field reflect.Value) bool {
-	return field.Kind() == reflect.Ptr
+	fullName := l.prefix + name
+	if value, ok := l.lookup(fullName); ok {
+		if l.log != nil {
+			logValue := value
+			if secret {
+				logValue = "***"
+			}
+			l.log("set %v with $%v=\"%v\"", fieldType.Name, fullName, logValue)
+		}
+		return setValue(field, value)
+	}
+	return nil
 }
 
 // indirect dereferences pointers and returns the actual value it points to.

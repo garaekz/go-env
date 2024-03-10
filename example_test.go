@@ -54,12 +54,15 @@ type Embedded struct {
 }
 
 type Config2 struct {
-	Nested Embedded `prefix:"NESTED_"`
+	Nested Embedded  `prefix:"NESTED_"`
+	Other  *Embedded `prefix:"OTHER_"` // pointer to struct
 }
 
 func Example_three() {
 	_ = os.Setenv("APP_NESTED_URL", "http://example.com")
 	_ = os.Setenv("APP_NESTED_PORT", "8080")
+	_ = os.Setenv("APP_OTHER_URL", "http://other.com")
+	_ = os.Setenv("APP_OTHER_PORT", "9090")
 
 	var cfg Config2
 
@@ -69,7 +72,12 @@ func Example_three() {
 
 	fmt.Println(cfg.Nested.URL)
 	fmt.Println(cfg.Nested.Port)
+	fmt.Println(cfg.Other.URL)
+	fmt.Println(cfg.Other.Port)
+
 	// Output:
 	// http://example.com
 	// 8080
+	// http://other.com
+	// 9090
 }
